@@ -41,9 +41,23 @@ class MultiForm(object):
         self.forms = OrderedDict()
         self.crossform_errors = []
 
+        self.form_keys = []
         for key, form_class in self.form_classes.items():
             fargs, fkwargs = self.get_form_args_kwargs(key, args, kwargs)
             self.forms[key] = form_class(*fargs, **fkwargs)
+            self.form_keys.append(key)
+
+        self.form_index = 0
+
+    def __iter__(self):
+        return self
+
+    def next(self): # Python 3: def __next__(self)
+        if self.form_index >= len(self.form_keys):
+            raise StopIteration
+        else:
+            self.form_index += 1
+            return self.forms[self.form_keys[self.form_index]]
 
     def get_form_args_kwargs(self, key, args, kwargs):
         """
