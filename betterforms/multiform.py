@@ -15,7 +15,8 @@ from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.safestring import mark_safe
 from django.utils.six.moves import reduce
-
+from django.http import QueryDict
+import pprint
 
 @python_2_unicode_compatible
 class MultiForm(object):
@@ -187,6 +188,37 @@ class MultiModelForm(MultiForm):
         self.instances = kwargs.pop('instance', None)
         if self.instances is None:
             self.instances = {}
+
+        self.formsDict = {}
+        self.formsPopulated = None
+
+        # populate the multiform with data (usually after a post)
+        if ('data' in kwargs.keys()):
+            data = kwargs['data']
+            tmpRequestData = {}
+            for dat in data.keys():
+                if (len(dat.split('__')) >= 2):
+                    model = dat.split('__')[0]
+                    field = dat.split('__')[1]
+
+                    if (tmpRequestData.get(model, 0) == 0):
+                        tmpRequestData[model] = {field : data[dat]}
+                    else:
+                        tmpRequestData[model][field] = data[dat]
+
+            for modelLabel in tmpRequestData.keys():
+                for cls in self.form_classes.values():
+                    if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
+                        qd = QueryDict(mutable=True)
+                        for field in tmpRequestData[modelLabel].keys():
+                            qd[field] = tmpRequestData[modelLabel][field]
+
+                        tmpRequestData[modelLabel][field]
+                        oForm = self.form_classes[modelLabel](qd)
+                        self.formsDict[modelLabel.lower()] = oForm
+
+            self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
+ 
         super(MultiModelForm, self).__init__(*args, **kwargs)
 
     def get_form_args_kwargs(self, key, args, kwargs):
@@ -200,10 +232,16 @@ class MultiModelForm(MultiForm):
         return fargs, fkwargs
 
     def save(self, commit=True):
-        objects = OrderedDict(
-            (key, form.save(commit))
-            for key, form in self.forms.items()
-        )
+        if (len(self.formsDict) > 0):
+            objects = OrderedDict(
+                (key, form.save(commit))
+                for key, form in self.formsPopulated
+            )
+        else:
+            objects = OrderedDict(
+                (key, form.save(commit))
+                for key, form in self.forms.items()
+            )
 
         if any(hasattr(form, 'save_m2m') for form in self.forms.values()):
             def save_m2m():
