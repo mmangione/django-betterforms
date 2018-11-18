@@ -186,8 +186,11 @@ class MultiModelForm(MultiForm):
     """
     def __init__(self, *args, **kwargs):
         self.instances = kwargs.pop('instance', None)
-        if self.instances is None:
+        #import pdb; pdb.set_trace()
+        if self.instances == None:
+            None
             self.instances = {}
+            #self.instances = self.get_objects()
 
         self.formsDict = {}
         self.formsPopulated = None
@@ -221,12 +224,20 @@ class MultiModelForm(MultiForm):
  
         super(MultiModelForm, self).__init__(*args, **kwargs)
 
+    def get_objects(self, pk = None):
+        for cls in self.form_classes.values():
+            if (pk == None):
+                raise Exception('No pk specified, update urls must include a pk id')
+
+        return self.get_objects(pk)
+
     def get_form_args_kwargs(self, key, args, kwargs):
         fargs, fkwargs = super(MultiModelForm, self).get_form_args_kwargs(key, args, kwargs)
         try:
             # If we only pass instance when there was one specified, we make it
             # possible to use non-ModelForms together with ModelForms.
-            fkwargs['instance'] = self.instances[key]
+            #fkwargs['instance'] = self.instances[key]
+            None
         except KeyError:
             pass
         return fargs, fkwargs
