@@ -16,6 +16,11 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils.safestring import mark_safe
 from django.utils.six.moves import reduce
 from django.http import QueryDict
+from django.db import models
+from django_fake_model.models import FakeModel
+from django.db.models.fields import AutoField
+from django.forms.models import ModelFormMetaclass
+from collections import OrderedDict
 import pprint
 
 @python_2_unicode_compatible
@@ -223,6 +228,37 @@ class MultiModelForm(MultiForm):
             self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
  
         super(MultiModelForm, self).__init__(*args, **kwargs)
+
+    def get_proxy_model(self, objects):
+
+        self.proxyFields = {}
+
+        for model_name in objects:
+            for field in objects[model_name]._meta.fields:
+                if (not isinstance(field, AutoField)):
+                    #setattr(self, field.__str__().split('.')[-1], models.CharField(max_length=100))
+                    self.proxyFields['%s__%s' % (model_name, field.__str__().split('.')[-1])] = ( field.__str__(), models.CharField(max_length=100) )
+
+        class ProxyModel(FakeModel):
+
+#            proxyFields = {}
+
+            def __init__(self, objects, *args, **kwargs):
+#                for model_name in objects:
+#                    for field in objects[model_name]._meta.fields:
+#                        if (not isinstance(field, AutoField)):
+#                            #setattr(self, field.__str__().split('.')[-1], models.CharField(max_length=100))
+#                            proxyFields['%s__%s' % (model_name, field.__str__().split('.')[-1])] = models.CharField(max_length=100)
+                return super(ProxyModel, self).__init__(*args, **kwargs)
+
+#            class Meta(ModelFormMetaclass):
+#                fields = OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields ])
+#                for model_name in objects:
+#                    fields.update(objects[model_name])
+
+        proxyModel = ProxyModel(objects)
+        proxyModel._meta.fields = OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields.keys() ])
+        return proxyModel
 
     def get_objects(self, pk = None):
         for cls in self.form_classes.values():
