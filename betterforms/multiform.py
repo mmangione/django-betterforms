@@ -202,6 +202,7 @@ class MultiModelForm(MultiForm):
         self.requestData = QueryDict(mutable=True)
         self.objects = {}
         self.form_keys = []
+        self.is_update = False
 
         # populate the multiform with data (usually after a post)
         if ('data' in kwargs.keys()):
@@ -231,6 +232,7 @@ class MultiModelForm(MultiForm):
             self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
  
         if (self.instance != None):
+            self.is_update = True
             tmpRequestData = {}
             for key in self.instance.keys():
                 model = key.lower()
