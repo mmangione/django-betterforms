@@ -199,6 +199,9 @@ class MultiModelForm(MultiForm):
 
         self.formsDict = {}
         self.formsPopulated = None
+        self.requestData = QueryDict(mutable=True)
+        self.objects = {}
+        self.form_keys = []
 
         # populate the multiform with data (usually after a post)
         if ('data' in kwargs.keys()):
@@ -227,12 +230,11 @@ class MultiModelForm(MultiForm):
 
             self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
  
-        if ('objects' in kwargs.keys()):
-            objects = kwargs['objects']
+        if (self.instance != None):
             tmpRequestData = {}
-            for key in objects.keys():
+            for key in self.instance.keys():
                 model = key.lower()
-                formClass = self.form_classes[model](instance=objects[model])
+                formClass = self.form_classes[model](instance=self.instance[model])
 
                 for field_name in formClass.fields:
                     bound_field = formClass[field_name]
@@ -246,17 +248,12 @@ class MultiModelForm(MultiForm):
             for modelLabel in tmpRequestData.keys():
                 for cls in self.form_classes.values():
                     if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
-                        qd = QueryDict(mutable=True)
                         for field in tmpRequestData[modelLabel].keys():
-                            qd[field] = tmpRequestData[modelLabel][field]
-
-                        tmpRequestData[modelLabel][field]
-                        oForm = self.form_classes[modelLabel](qd)
-                        self.formsDict[modelLabel.lower()] = oForm
-
-            self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
+                            # populating request data for MultiModelForm instance creation (for updates)
+                            self.requestData[field] = (cls, tmpRequestData[modelLabel][field])
  
-        kwargs.pop('objects')
+            self.form_keys = []
+            self.model = self.get_proxy_model(self.instance)
         super(MultiModelForm, self).__init__(*args, **kwargs)
 
     def get_proxy_model(self, objects):
@@ -281,12 +278,22 @@ class MultiModelForm(MultiForm):
 #                            proxyFields['%s__%s' % (model_name, field.__str__().split('.')[-1])] = models.CharField(max_length=100)
                 return super(ProxyModel, self).__init__(*args, **kwargs)
 
-#            class Meta(ModelFormMetaclass):
+        class Meta(ModelFormMetaclass):
 #                fields = OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields ])
 #                for model_name in objects:
 #                    fields.update(objects[model_name])
+            ordering = ('pk',)
+            verbose_name = 'Proxy Model'
+            verbose_name_plural = 'Proxy Models'
+            permissions = (
+                ("view_dataplanreply_attributes", "Can see plan reply attributes"),
+            )
+
 
         proxyModel = ProxyModel(objects)
+
+        # for verbose_namel.title() # cruds utils.py line 73
+        #proxyModel._meta = Meta('', ('',), {})
         proxyModel._meta.fields = [ self.proxyFields[x][1] for x in self.proxyFields.keys() ]
         proxyModel._meta.fields = tuple(proxyModel._meta.fields)
         #import pdb; pdb.set_trace()
@@ -299,9 +306,17 @@ class MultiModelForm(MultiForm):
 
         return self.get_objects(pk)
 
+    def set_objects(self, pk = None):
+        for cls in self.form_classes.values():
+            if (pk == None):
+                raise Exception('No pk specified, update urls must include a pk id')
+        self.objects = self.get_objects(pk)
+        None
+
     @property
     def fields(self):
-        return OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields.keys() ])
+        #return OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields.keys() ])
+        return OrderedDict([ (x, self.requestData[x]) for x in self.requestData.keys() ])
 
         fields = []
         for form_name in self.forms:
