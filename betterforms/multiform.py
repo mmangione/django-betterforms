@@ -190,12 +190,12 @@ class MultiModelForm(MultiForm):
     and adds a save method.
     """
     def __init__(self, *args, **kwargs):
-        self.instances = kwargs.pop('instance', None)
+        self.instance = kwargs.pop('instance', None)
         #import pdb; pdb.set_trace()
-        if self.instances == None:
-            None
-            self.instances = {}
-            #self.instances = self.get_objects()
+#        if self.instances == None:
+#            None
+#            self.instances = {}
+#            #self.instances = self.get_objects()
 
         self.formsDict = {}
         self.formsPopulated = None
@@ -227,6 +227,36 @@ class MultiModelForm(MultiForm):
 
             self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
  
+        if ('objects' in kwargs.keys()):
+            objects = kwargs['objects']
+            tmpRequestData = {}
+            for key in objects.keys():
+                model = key.lower()
+                formClass = self.form_classes[model](instance=objects[model])
+
+                for field_name in formClass.fields:
+                    bound_field = formClass[field_name]
+
+                    field_name = '%s__%s' % (model, field_name)
+                    if (tmpRequestData.get(model, 0) == 0):
+                        tmpRequestData[model] = {field_name : bound_field}
+                    else:
+                        tmpRequestData[model][field_name] = bound_field
+
+            for modelLabel in tmpRequestData.keys():
+                for cls in self.form_classes.values():
+                    if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
+                        qd = QueryDict(mutable=True)
+                        for field in tmpRequestData[modelLabel].keys():
+                            qd[field] = tmpRequestData[modelLabel][field]
+
+                        tmpRequestData[modelLabel][field]
+                        oForm = self.form_classes[modelLabel](qd)
+                        self.formsDict[modelLabel.lower()] = oForm
+
+            self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
+ 
+        kwargs.pop('objects')
         super(MultiModelForm, self).__init__(*args, **kwargs)
 
     def get_proxy_model(self, objects):
@@ -257,7 +287,9 @@ class MultiModelForm(MultiForm):
 #                    fields.update(objects[model_name])
 
         proxyModel = ProxyModel(objects)
-        proxyModel._meta.fields = OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields.keys() ])
+        proxyModel._meta.fields = [ self.proxyFields[x][1] for x in self.proxyFields.keys() ]
+        proxyModel._meta.fields = tuple(proxyModel._meta.fields)
+        #import pdb; pdb.set_trace()
         return proxyModel
 
     def get_objects(self, pk = None):
@@ -267,15 +299,24 @@ class MultiModelForm(MultiForm):
 
         return self.get_objects(pk)
 
+    @property
+    def fields(self):
+        return OrderedDict([ (x, self.proxyFields[x]) for x in self.proxyFields.keys() ])
+
+        fields = []
+        for form_name in self.forms:
+            form = self.forms[form_name]
+            for field_name in form.fields:
+                fields += [form.add_prefix(field_name)]
+        return fields
+
     def get_form_args_kwargs(self, key, args, kwargs):
         fargs, fkwargs = super(MultiModelForm, self).get_form_args_kwargs(key, args, kwargs)
-        try:
-            # If we only pass instance when there was one specified, we make it
-            # possible to use non-ModelForms together with ModelForms.
-            #fkwargs['instance'] = self.instances[key]
-            None
-        except KeyError:
-            pass
+
+        self.object = self.get_proxy_model(self.get_objects(pk=1))
+        if hasattr(self, 'object'):
+            kwargs.update({'instance': self.object})
+
         return fargs, fkwargs
 
     def save(self, commit=True):
