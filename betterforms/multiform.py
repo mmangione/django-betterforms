@@ -204,7 +204,7 @@ class MultiModelForm(MultiForm):
         self.form_keys = []
         self.is_update = False
 
-        # populate the multiform with data (usually after a post)
+        # populate the multiform including the db model objects with data (usually after a post)
         if ('data' in kwargs.keys()):
             data = kwargs['data']
             tmpRequestData = {}
@@ -234,6 +234,7 @@ class MultiModelForm(MultiForm):
         if (self.instance != None):
             self.is_update = True
             tmpRequestData = {}
+
             for key in self.instance.keys():
                 model = key.lower()
                 formClass = self.form_classes[model](instance=self.instance[model])
@@ -253,7 +254,7 @@ class MultiModelForm(MultiForm):
                         for field in tmpRequestData[modelLabel].keys():
                             # populating request data for MultiModelForm instance creation (for updates)
                             self.requestData[field] = (cls, tmpRequestData[modelLabel][field])
- 
+
             self.form_keys = []
             self.model = self.get_proxy_model(self.instance)
         super(MultiModelForm, self).__init__(*args, **kwargs)
@@ -306,12 +307,14 @@ class MultiModelForm(MultiForm):
             if (pk == None):
                 raise Exception('No pk specified, update urls must include a pk id')
 
-        return self.get_objects(pk)
+        objects = self.get_objects(pk)
+        return objects
 
     def set_objects(self, pk = None):
         for cls in self.form_classes.values():
             if (pk == None):
                 raise Exception('No pk specified, update urls must include a pk id')
+
         self.objects = self.get_objects(pk)
         None
 
@@ -336,13 +339,28 @@ class MultiModelForm(MultiForm):
         return fargs, fkwargs
 
     def save(self, commit=True):
-        if (len(self.formsDict) > 0):
+        if (len(self.objects) > 0):
+            objects = self.objects
+
+            # if updating, get the objects that contain the updated data
+            objectsData = OrderedDict(
+                (key, form.save(commit))
+                for key, form in self.formsPopulated
+            )
+
+            for objKey in objects.keys():
+                for objDataKey in objectsData.keys():
+                    if (objKey == objDataKey):
+                        for field_name in objects[objKey].__dict__.keys():
+                            if (field_name not in ['_state', 'id'] and not objectsData[objKey].__getattribute__(field_name) in ['', None]):
+                                setattr(objects[objKey], field_name, objectsData[objKey].__getattribute__(field_name))
+
+        elif (len(self.formsDict) > 0):
             objects = OrderedDict(
                 (key, form.save(commit))
                 for key, form in self.formsPopulated
             )
-        elif (len(self.objects) > 0):
-            objects = self.objects
+ 
         else:
             objects = OrderedDict(
                 (key, form.save(commit))
