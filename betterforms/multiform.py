@@ -330,7 +330,6 @@ class MultiModelForm(MultiForm):
     def get_form_args_kwargs(self, key, args, kwargs):
         fargs, fkwargs = super(MultiModelForm, self).get_form_args_kwargs(key, args, kwargs)
 
-        self.object = self.get_proxy_model(self.get_objects(pk=1))
         if hasattr(self, 'object'):
             kwargs.update({'instance': self.object})
 
@@ -342,6 +341,8 @@ class MultiModelForm(MultiForm):
                 (key, form.save(commit))
                 for key, form in self.formsPopulated
             )
+        elif (len(self.objects) > 0):
+            objects = self.objects
         else:
             objects = OrderedDict(
                 (key, form.save(commit))
