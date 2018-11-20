@@ -296,7 +296,17 @@ class MultiModelForm(MultiForm):
         proxyModel = ProxyModel(objects)
 
         # for verbose_namel.title() # cruds utils.py line 73
+        firstModelObject = next(iter(objects.values()))
         #proxyModel._meta = Meta('', ('',), {})
+        if (hasattr(firstModelObject._meta, 'ordering')):
+            proxyModel._meta.ordering = firstModelObject._meta.ordering
+        if (hasattr(firstModelObject._meta, 'verbose_name')):
+            proxyModel._meta.verbose_name = firstModelObject._meta.verbose_name
+        if (hasattr(firstModelObject._meta, 'verbose_name_plural')):
+            proxyModel._meta.verbose_name_plural = firstModelObject._meta.verbose_name_plural
+        if (hasattr(firstModelObject._meta, 'permissions')):
+            proxyModel._meta.permissions = firstModelObject._meta.permissions
+
         proxyModel._meta.fields = [ self.proxyFields[x][1] for x in self.proxyFields.keys() ]
         proxyModel._meta.fields = tuple(proxyModel._meta.fields)
         #import pdb; pdb.set_trace()
@@ -352,6 +362,8 @@ class MultiModelForm(MultiForm):
                 for objDataKey in objectsData.keys():
                     if (objKey == objDataKey):
                         for field_name in objects[objKey].__dict__.keys():
+                            # TODO: do not in ['', None] / not null check on fields that have model fields not null
+                            # TODO: handle datetime update set to default updatetime = CURRENT_TIMESTAMP etc.
                             if (field_name not in ['_state', 'id'] and not objectsData[objKey].__getattribute__(field_name) in ['', None]):
                                 setattr(objects[objKey], field_name, objectsData[objKey].__getattribute__(field_name))
 
