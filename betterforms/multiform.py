@@ -362,9 +362,7 @@ class MultiModelForm(MultiForm):
                 for objDataKey in objectsData.keys():
                     if (objKey == objDataKey):
                         for field_name in objects[objKey].__dict__.keys():
-                            # TODO: do not in ['', None] / not null check on fields that have model fields not null
-                            # TODO: handle datetime update set to default updatetime = CURRENT_TIMESTAMP etc.
-                            if (field_name not in ['_state', 'id'] and not objectsData[objKey].__getattribute__(field_name) in ['', None]):
+                            if (field_name not in ['_state', 'id'] and not objectsData[objKey].__getattribute__(field_name) in [None]):
                                 setattr(objects[objKey], field_name, objectsData[objKey].__getattribute__(field_name))
 
         elif (len(self.formsDict) > 0):
