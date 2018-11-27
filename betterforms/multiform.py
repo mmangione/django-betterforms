@@ -32,6 +32,7 @@ class MultiForm(object):
     else that you are using a MultiForm.
     """
     form_classes = {}
+    forms = {}
 
     def __init__(self, data=None, files=None, *args, **kwargs):
         # Some things, such as the WizardView expect these to exist.
@@ -127,6 +128,7 @@ class MultiForm(object):
         self.crossform_errors.append(e)
 
     def is_valid(self):
+#        import pdb; pdb.set_trace()
         forms_valid = all(form.is_valid() for form in self.forms.values())
         try:
             self.cleaned_data = self.clean()
@@ -189,6 +191,51 @@ class MultiModelForm(MultiForm):
     means that it includes support for the instance parameter in initialization
     and adds a save method.
     """
+
+    formsDict = {}
+    formsPopulated = None
+    requestData = QueryDict(mutable=True)
+    objects = {}
+    form_keys = []
+    is_update = False
+    tmpRequestData = {}
+
+    def populateFormData(self, data, objects={}):
+        # populate the multiform including the db model objects with data (usually after a post)
+        self.tmpRequestData = {}
+        tmpData = {}
+        for dat in data.keys():
+            if (len(dat.split('__')) >= 2):
+                model = dat.split('__')[0]
+                field = dat.split('__')[1]
+
+                if (self.tmpRequestData.get(model, 0) == 0):
+                    self.tmpRequestData[model] = {field : data[dat]}
+                    tmpData[model] = {field : data[dat]}
+                else:
+                    self.tmpRequestData[model][field] = data[dat]
+                    tmpData[model][field] = data[dat]
+
+        for modelLabel in self.tmpRequestData.keys():
+            for cls in self.form_classes.values():
+                if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
+                    qd = QueryDict(mutable=True)
+                    for field in self.tmpRequestData[modelLabel].keys():
+                        qd[field] = self.tmpRequestData[modelLabel][field]
+
+                    self.tmpRequestData[modelLabel][field]
+                    #oForm = self.form_classes[modelLabel](qd)
+                    if (len(objects) > 0):
+                        oValidForm = self.form_classes[modelLabel](data=tmpData[modelLabel], instance=objects[modelLabel])
+                    else:
+                        oValidForm = self.form_classes[modelLabel](data=tmpData[modelLabel])
+                    if hasattr(oValidForm, '__bases__'):
+                        oValidForm.__bases__ += (MultiModelForm,)
+                    self.formsDict[modelLabel.lower()] = oValidForm
+                    self.forms[modelLabel] = oValidForm
+
+        self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
+
     def __init__(self, *args, **kwargs):
         self.instance = kwargs.pop('instance', None)
         #import pdb; pdb.set_trace()
@@ -197,41 +244,11 @@ class MultiModelForm(MultiForm):
 #            self.instances = {}
 #            #self.instances = self.get_objects()
 
-        self.formsDict = {}
-        self.formsPopulated = None
-        self.requestData = QueryDict(mutable=True)
-        self.objects = {}
-        self.form_keys = []
-        self.is_update = False
-
         # populate the multiform including the db model objects with data (usually after a post)
         if ('data' in kwargs.keys()):
-            data = kwargs['data']
-            tmpRequestData = {}
-            for dat in data.keys():
-                if (len(dat.split('__')) >= 2):
-                    model = dat.split('__')[0]
-                    field = dat.split('__')[1]
-
-                    if (tmpRequestData.get(model, 0) == 0):
-                        tmpRequestData[model] = {field : data[dat]}
-                    else:
-                        tmpRequestData[model][field] = data[dat]
-
-            for modelLabel in tmpRequestData.keys():
-                for cls in self.form_classes.values():
-                    if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
-                        qd = QueryDict(mutable=True)
-                        for field in tmpRequestData[modelLabel].keys():
-                            qd[field] = tmpRequestData[modelLabel][field]
-
-                        tmpRequestData[modelLabel][field]
-                        oForm = self.form_classes[modelLabel](qd)
-                        self.formsDict[modelLabel.lower()] = oForm
-
-            self.formsPopulated = [ (x, self.formsDict[x]) for x in self.formsDict.keys() ]
- 
-        if (self.instance != None):
+            ret = super(MultiModelForm, self).__init__(*args, **kwargs)
+            self.populateFormData(kwargs['data'])
+        elif (self.instance != None):
             self.is_update = True
             tmpRequestData = {}
 
@@ -257,7 +274,37 @@ class MultiModelForm(MultiForm):
 
             self.form_keys = []
             self.model = self.get_proxy_model(self.instance)
-        super(MultiModelForm, self).__init__(*args, **kwargs)
+            return super(MultiModelForm, self).__init__(*args, **kwargs)
+        else:
+            return super(MultiModelForm, self).__init__(*args, **kwargs)
+    
+    def is_valid(self):
+        #forms_valid = all(form.is_valid() for key, form in self.forms)
+        forms_valid = all(form.is_valid() for form in self.forms.values())
+        try:
+            self.cleaned_data = self.clean()
+        except ValidationError as e:
+            self.add_crossform_error(e)
+        return forms_valid and not self.crossform_errors
+
+    def get_objects(self, pk = None):
+        for cls in self.form_classes.values():
+            if (pk == None):
+                raise Exception('No pk specified, update urls must include a pk id')
+
+        objects = self.get_objects(pk)
+
+        return objects
+
+    def set_objects(self, pk=None, data={}):
+        for cls in self.form_classes.values():
+            if (pk == None):
+                raise Exception('No pk specified, update urls must include a pk id')
+
+        self.objects = self.get_objects(pk)
+
+        if (len(data)) > 0:
+            self.populateFormData(data, self.objects)
 
     def get_proxy_model(self, objects):
 
@@ -311,22 +358,6 @@ class MultiModelForm(MultiForm):
         proxyModel._meta.fields = tuple(proxyModel._meta.fields)
         #import pdb; pdb.set_trace()
         return proxyModel
-
-    def get_objects(self, pk = None):
-        for cls in self.form_classes.values():
-            if (pk == None):
-                raise Exception('No pk specified, update urls must include a pk id')
-
-        objects = self.get_objects(pk)
-        return objects
-
-    def set_objects(self, pk = None):
-        for cls in self.form_classes.values():
-            if (pk == None):
-                raise Exception('No pk specified, update urls must include a pk id')
-
-        self.objects = self.get_objects(pk)
-        None
 
     @property
     def fields(self):
