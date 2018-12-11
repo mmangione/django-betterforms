@@ -219,12 +219,6 @@ class MultiModelForm(MultiForm):
         for modelLabel in self.tmpRequestData.keys():
             for cls in self.form_classes.values():
                 if (cls.Meta.model.__name__.lower() == modelLabel.lower()):
-                    qd = QueryDict(mutable=True)
-                    for field in self.tmpRequestData[modelLabel].keys():
-                        qd[field] = self.tmpRequestData[modelLabel][field]
-
-                    self.tmpRequestData[modelLabel][field]
-                    #oForm = self.form_classes[modelLabel](qd)
                     if (len(objects) > 0):
                         oValidForm = self.form_classes[modelLabel](data=tmpData[modelLabel], instance=objects[modelLabel])
                     else:
@@ -238,11 +232,6 @@ class MultiModelForm(MultiForm):
 
     def __init__(self, *args, **kwargs):
         self.instance = kwargs.pop('instance', None)
-        #import pdb; pdb.set_trace()
-#        if self.instances == None:
-#            None
-#            self.instances = {}
-#            #self.instances = self.get_objects()
 
         # populate the multiform including the db model objects with data (usually after a post)
         if ('data' in kwargs.keys()):
@@ -279,7 +268,6 @@ class MultiModelForm(MultiForm):
             return super(MultiModelForm, self).__init__(*args, **kwargs)
     
     def is_valid(self):
-        #forms_valid = all(form.is_valid() for key, form in self.forms)
         forms_valid = all(form.is_valid() for form in self.forms.values())
         try:
             self.cleaned_data = self.clean()
@@ -313,7 +301,6 @@ class MultiModelForm(MultiForm):
         for model_name in objects:
             for field in objects[model_name]._meta.fields:
                 if (not isinstance(field, AutoField)):
-                    #setattr(self, field.__str__().split('.')[-1], models.CharField(max_length=100))
                     self.proxyFields['%s__%s' % (model_name, field.__str__().split('.')[-1])] = ( field.__str__(), models.CharField(max_length=100) )
 
         class ProxyModel(FakeModel):
