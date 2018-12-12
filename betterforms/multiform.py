@@ -224,6 +224,7 @@ class MultiModelForm(MultiForm):
                         oValidForm = self.form_classes[modelLabel](data=tmpData[modelLabel])
                     if hasattr(oValidForm, '__bases__'):
                         oValidForm.__bases__ += (MultiModelForm,)
+
                     self.formsDict[modelLabel.lower()] = oValidForm
                     self.forms[modelLabel] = oValidForm
 
@@ -405,3 +406,7 @@ class MultiModelForm(MultiForm):
             self.save_m2m = save_m2m
 
         return objects
+
+    # Disable the ul of errors, only display inline errors
+    def non_field_errors(self):
+        return None
