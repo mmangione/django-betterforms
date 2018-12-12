@@ -128,7 +128,6 @@ class MultiForm(object):
         self.crossform_errors.append(e)
 
     def is_valid(self):
-#        import pdb; pdb.set_trace()
         forms_valid = all(form.is_valid() for form in self.forms.values())
         try:
             self.cleaned_data = self.clean()
@@ -268,11 +267,15 @@ class MultiModelForm(MultiForm):
             return super(MultiModelForm, self).__init__(*args, **kwargs)
     
     def is_valid(self):
-        forms_valid = all(form.is_valid() for form in self.forms.values())
-        try:
-            self.cleaned_data = self.clean()
-        except ValidationError as e:
-            self.add_crossform_error(e)
+        forms_valid = all(form.is_valid() for key, form in self.formsPopulated)
+
+        for key, form in self.formsPopulated:
+            try:
+                self.cleaned_data = self.clean()
+                if (isinstance(form.instance, models.Model)):
+                    form.instance.full_clean()
+            except ValidationError as e:
+                self.add_crossform_error(e)
         return forms_valid and not self.crossform_errors
 
     def get_objects(self, pk = None):
@@ -343,7 +346,6 @@ class MultiModelForm(MultiForm):
 
         proxyModel._meta.fields = [ self.proxyFields[x][1] for x in self.proxyFields.keys() ]
         proxyModel._meta.fields = tuple(proxyModel._meta.fields)
-        #import pdb; pdb.set_trace()
         return proxyModel
 
     @property
