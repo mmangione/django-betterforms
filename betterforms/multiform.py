@@ -409,4 +409,9 @@ class MultiModelForm(MultiForm):
 
     # Disable the ul of errors, only display inline errors
     def non_field_errors(self):
-        return None
+        nonFieldErrors = super(MultiModelForm, self).non_field_errors()
+        retErrorsDict = {}
+        for key, value in nonFieldErrors:
+            retErrorsDict['%s %s' % (key, ' '.join(value))] = ''
+
+        return retErrorsDict
