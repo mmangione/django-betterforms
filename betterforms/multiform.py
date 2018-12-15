@@ -275,7 +275,7 @@ class MultiModelForm(MultiForm):
                 self.cleaned_data = self.clean()
                 if (isinstance(form.instance, models.Model)):
                     form.instance.full_clean()
-                form.save(commit=False)
+
             except ValidationError as e:
                 self.add_crossform_error(e)
 
